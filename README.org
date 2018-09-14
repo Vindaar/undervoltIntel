@@ -4,6 +4,9 @@ basically just a simplified interface to inserting the =msr= kernel
 module and calculating the correct hex values for the =0x150= msr
 register to be set via =wrmsr=.
 
+Keep in mind that the values set by the tool will be reset back to
+defaults on every boot or even after sleep (as far as I'm aware).
+
 Note: this tool explicitly only does *undervolting*. All values given
 are interpreted as negative offsets!
 
