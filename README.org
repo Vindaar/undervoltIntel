@@ -45,15 +45,21 @@ nim c undervoltIntel.nim
 
 ** Usage
 Usage is very simple. Two parameters are needed, =CPU= and =iGPU=. The
-values are given in =mV=.
+values are given in =mV=. Alternatively use the =--read= flag to read
+out the currently set voltage levels in =mV=. 
+
+*Note:* both the write as well as the read (!) command need super user
+permissions!
 
 #+BEGIN_SRC 
 Usage:
-  undervoltIntel --CPU=VAL1 --iGPU=VAL2 [options]
+  undervoltIntel (--CPU=VAL1 --iGPU=VAL2 | --read) [options]
 
 Options:
   --CPU=VAL1      The undervolt to be applied to CPU core and cache in mV.
   --iGPU=VAL2     The undervolt to be applied to the integrated GPU in mV.
+  --read          If called with read flag, will only output current msr
+                  register values.
   -h, --help      Show this help.
 #+END_SRC
 
