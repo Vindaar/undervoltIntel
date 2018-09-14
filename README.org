@@ -1,5 +1,5 @@
 * undervoltIntel
-A very simple tool to undervolt you Haswell and newer Intel CPU. It's
+A very simple tool to undervolt your Haswell and newer Intel CPU. It's
 basically just a simplified interface to inserting the =msr= kernel
 module and calculating the correct hex values for the =0x150= msr
 register to be set via =wrmsr=.
@@ -10,7 +10,7 @@ defaults on every boot or even after sleep (as far as I'm aware).
 Note: this tool explicitly only does *undervolting*. All values given
 are interpreted as negative offsets!
 
-It's was built based on the following resources: 
+It was built based on the following resources: 
 - https://wiki.manjaro.org/index.php?title=Undervolt_intel_CPU
 - https://github.com/mihic/linux-intel-undervolt
 and to an extent =Throttlestop=.
