@@ -1,0 +1,58 @@
+* undervoltIntel
+A very simple tool to undervolt you Haswell and newer Intel CPU. It's
+basically just a simplified interface to inserting the =msr= kernel
+module and calculating the correct hex values for the =0x150= msr
+register to be set via =wrmsr=.
+
+Note: this tool explicitly only does *undervolting*. All values given
+are interpreted as negative offsets!
+
+It's was built based on the following resources: 
+- https://wiki.manjaro.org/index.php?title=Undervolt_intel_CPU
+- https://github.com/mihic/linux-intel-undervolt
+and to an extent =Throttlestop=.
+
+If the =msr= kernel module is not inserted, the tool will try to do
+that for you, via =modprobe msr=. 
+
+** Dependencies
+It only depends on the [[https://github.com/nim-lang/Nim][Nim compiler]] (to compile, not to run!) and the
+=msr-tools= package. 
+For most linux distributions, the needed package to write the MSR
+register, should be named =msr-tools=. Install it via your package manager.
+
+** Installation
+Simply clone the repository
+#+BEGIN_SRC sh
+git clone https://github.com/vindaar/undervoltIntel
+cd undervoltIntel
+#+END_SRC
+and then build it either with =nimble= (Nim's package manager) or
+compile it manually.
+
+Nimble:
+#+BEGIN_SRC 
+nimble build
+#+END_SRC
+
+nim:
+#+BEGIN_SRC 
+nim c undervoltIntel.nim
+#+END_SRC
+
+** Usage
+Usage is very simple. Two parameters are needed, =CPU= and =iGPU=. The
+values are given in =mV=.
+
+#+BEGIN_SRC 
+Usage:
+  undervoltIntel --CPU=VAL1 --iGPU=VAL2 [options]
+
+Options:
+  --CPU=VAL1      The undervolt to be applied to CPU core and cache in mV.
+  --iGPU=VAL2     The undervolt to be applied to the integrated GPU in mV.
+  -h, --help      Show this help.
+#+END_SRC
+
+** License
+Published under the MIT license.
