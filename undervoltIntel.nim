@@ -1,7 +1,7 @@
 # a little tool to undervolt an intel CPU (haswell and newer)
 
 import docopt
-import strutils, math, osproc
+import strutils, math, osproc, strformat
 
 const doc = """
 A small tool to undervolt an Intel (Haswell and newer) CPU on linux.
@@ -11,11 +11,13 @@ NOTE: values given are always interpreted as negative integers! To overvolt
 your CPU, rewrite the code...
 
 Usage:
-  undervoltIntel --CPU=VAL1 --iGPU=VAL2 [options]
+  undervoltIntel (--CPU=VAL1 --iGPU=VAL2 | --read) [options]
 
 Options:
   --CPU=VAL1      The undervolt to be applied to CPU core and cache in mV.
   --iGPU=VAL2     The undervolt to be applied to the integrated GPU in mV.
+  --read          If called with read flag, will only output current msr
+                  register values.
   -h, --help      Show this help.
 """
 
@@ -50,13 +52,13 @@ proc insertOrCheckMsrModule() =
   if outp.len == 0:
     (outp, errC) = execCmdEx("sudo modprobe msr")
     if errC != 0:
-      echo "Could not insert `msr` kernel module! errC: " & $errC
+      echo &"Could not insert `msr` kernel module! errC: {errC}"
     else:
       (outp, errC) = execCmdEx("lsmod | cut -d' ' -f1 | grep msr")
       if outp.strip != "msr":
-        quit("Did not successfully insert `msr` module! Output: " & outp.strip)
+        quit(&"Did not successfully insert `msr` module! Output: {outp.strip}")
       else:
-        echo "succesfully inserted `msr` module: " & outp
+        echo &"succesfully inserted `msr` module: {outp}"
 
 func convertToHexStr(x: int): string =
   ## calculates the hex string from the undervolt in mV
@@ -74,6 +76,13 @@ func convertToHexStr(x: int): string =
   let xShift = xInvU8.uint32 shl 21
   result = toHex(xShift or mask)
 
+func hexToMilliVolt(x: string): int =
+  ## calculates the mV value from the hex string. Inverse of above
+  let xInt = (&"0x{x}").parseHexInt.uint32
+  let xShift = xInt shr 21
+  let xInvU8 = ((xShift - 1).uint8 xor 0xFF'u8)
+  result = (xInvU8.float / 1.024).round.int
+
 func genCmdString(offset: string, writeRead: ReadWriteKind,
                   plane: PlaneKind): string =
   ## generates the final command string from the value and the plane
@@ -85,11 +94,11 @@ func genCmdString(offset: string, writeRead: ReadWriteKind,
 
 func writeCall(cmd: string): string =
   ## returns the write call of the given command
-  result = "sudo " & WriteProg & " " & MsrRegister & " " & cmd
+  result = &"sudo {WriteProg} {MsrRegister} {cmd}"
 
 func readCall(): string =
   ## returns the read call
-  result = "sudo " & ReadProg & " " & MsrRegister
+  result = &"sudo {ReadProg} {MsrRegister}"
 
 proc execCommand(readWrite: ReadWriteKind, cmd = ""): string =
   ## executes the system call
@@ -101,7 +110,7 @@ proc execCommand(readWrite: ReadWriteKind, cmd = ""): string =
     cmdString = writeCall(cmd)
   let (outp, errC) = execCmdEx(cmdString)
   if errC != 0:
-    echo "Error occured during call to: " & cmdString
+    echo &"Error occured during call to: {cmdString}"
   result = outp
 
 proc readPlane(plane: PlaneKind): string =
@@ -114,8 +123,16 @@ proc readPlane(plane: PlaneKind): string =
 
 when isMainModule:
   let args = docopt(doc)
-  let cpuVal = ($args["--CPU"]).parseInt
-  let gpuVal = ($args["--iGPU"]).parseInt
+  var
+    cpuVal: int
+    gpuVal: int
+    outputPrefix = ""
+
+  let readOnly = if $args["--read"] == "true": true else: false
+  if not readOnly:
+    outputPrefix = "\t"
+    cpuVal = ($args["--CPU"]).parseInt
+    gpuVal = ($args["--iGPU"]).parseInt
 
   # make sure conversion to hex works and command creation
   # works as intended!
@@ -125,21 +142,36 @@ when isMainModule:
   doAssert genCmdString(testVal, rwWrite, pkIGpu)    == "0x80000111E9A00000"
   doAssert genCmdString(ReadValue, rwRead, pkIGpu)   == "0x8000011000000000"
 
-  let cpu = convertToHexStr(cpuVal)
-  let gpu = convertToHexStr(gpuVal)
-
-  # create the command strings
-  let cpuCore = genCmdString(cpu, rwWrite, pkCpuCore)
-  let cpuCache = genCmdString(cpu, rwWrite, pkCpuCache)
-  let iGpu = genCmdString(gpu, rwWrite, pkIGpu)
-
   # before we do anything, check if the MSR kernel module is inserted
   insertOrCheckMsrModule()
 
-  discard execCommand(rwWrite, cpuCore)
-  discard execCommand(rwWrite, cpuCache)
-  discard execCommand(rwWrite, iGpu)
+  var
+    cpu: string
+    gpu: string
+  if not readOnly:
+    cpu = convertToHexStr(cpuVal)
+    gpu = convertToHexStr(gpuVal)
 
-  doAssert readPlane(pkCpuCore) == cpu.normalize, " was " & readPlane(pkCpuCore)
-  doAssert readPlane(pkCpuCache) == cpu.normalize, " was " & readPlane(pkCpuCache)
-  doAssert readPlane(pkIGpu) == gpu.normalize, " was " & readPlane(pkIGpu)
+    # create the command strings
+    let cpuCore = genCmdString(cpu, rwWrite, pkCpuCore)
+    let cpuCache = genCmdString(cpu, rwWrite, pkCpuCache)
+    let iGpu = genCmdString(gpu, rwWrite, pkIGpu)
+
+    discard execCommand(rwWrite, cpuCore)
+    discard execCommand(rwWrite, cpuCache)
+    discard execCommand(rwWrite, iGpu)
+
+  let
+    readCore = readPlane(pkCpuCore)
+    readCache = readPlane(pkCpuCache)
+    readIGpu = readPlane(pkIGpu)
+
+  if not readOnly:
+    doAssert readCore == cpu.normalize, &" was {readPlane(pkCpuCore)}"
+    doAssert readCache == cpu.normalize, &" was {readPlane(pkCpuCache)}"
+    doAssert readIGpu == gpu.normalize, &" was {readPlane(pkIGpu)}"
+    echo "Successfully set:"
+
+  echo &"{outputPrefix}CPU core: -{readCore.hexToMilliVolt} mV"
+  echo &"{outputPrefix}CPU cache: -{readCache.hexToMilliVolt} mV"
+  echo &"{outputPrefix}iGPU: -{readIGpu.hexToMilliVolt} mV"
